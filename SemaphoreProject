@@ -1,0 +1,148 @@
+#include "Timer.h"
+
+#include <Wire.h>
+
+char received;
+
+Timer t1, t2;
+int RED1 = 3, GREEN1 = 4, RED2 = 5, GREEN2 = 6;
+bool toggle = false;
+bool toggle_red = true;
+bool keep_red = false;
+
+void setup() {
+  Wire.begin(9);
+  Wire.onReceive(button_pressed);
+
+  pinMode(RED1, OUTPUT);
+  pinMode(GREEN1, OUTPUT);
+  pinMode(RED2, OUTPUT);
+  pinMode(GREEN2, OUTPUT);
+
+  digitalWrite(GREEN2, HIGH);
+  digitalWrite(RED1, HIGH);
+
+  t1.every(4000, switch_light_red);
+  t2.every(4000, switch_light_green);
+}
+
+void loop() {
+  t1.update();
+  t2.update();
+}
+
+void button_pressed(int bytes) {
+  received = Wire.read();
+
+  if (received == '1') {
+    digitalWrite(RED1, HIGH);
+    digitalWrite(RED2, HIGH);
+    digitalWrite(GREEN1, LOW);
+    digitalWrite(GREEN2, LOW);
+  }
+
+  Serial.println(received);
+}
+
+void switch_light_red() {
+  int light_on = RED1, light_off = RED2;
+  if (toggle_red) {
+    light_on = RED2;
+    light_off = RED1;
+    toggle_red = false;
+  } else
+    toggle_red = true;
+
+  digitalWrite(light_on, HIGH);
+  if (received != '1')
+    digitalWrite(light_off, LOW);
+}
+
+void switch_light_green() {
+  //true -> GREEN1     false -> GREEN2
+  int to_switch = GREEN1;
+  if (toggle) {
+    toggle = false;
+  } else {
+    to_switch = GREEN2;
+    toggle = true;
+  }
+
+  digitalWrite(GREEN1, LOW);
+  digitalWrite(GREEN2, LOW);
+
+  long current_millis = millis();
+  for (int i = 0; i < 2; i++) {
+    while (millis() - current_millis < 250)
+      ;
+    current_millis = millis();
+
+    if (received != '1')
+      digitalWrite(to_switch, HIGH);
+
+    while (millis() - current_millis < 250)
+      ;
+    current_millis = millis();
+
+    digitalWrite(to_switch, LOW);
+  }
+
+  if (received == '1')
+    return;
+
+  if (toggle)
+    digitalWrite(GREEN1, HIGH);
+	  else
+	    digitalWrite(GREEN2, HIGH);
+	}
+
+------------------------------------------------------•	Board on right
+
+#include <Wire.h>
+volatile bool changedByInterr = false;
+volatile bool notSetAlready = true;
+long innerTimer = 0;
+int b1;
+long secondInnerTimer = 0;
+void setup() {
+  Serial.begin(9600);
+
+  Wire.begin();
+  pinMode(2, INPUT_PULLUP);
+  pinMode(5, OUTPUT);
+  pinMode(4, OUTPUT);
+  attachInterrupt(digitalPinToInterrupt(2), TurnGreen, FALLING);
+  digitalWrite(4, LOW);
+  digitalWrite(5, HIGH);
+}
+
+void loop() {
+  normalSemaphore();
+}
+
+void normalSemaphore(void) {
+
+  if (changedByInterr) {
+    digitalWrite(5, LOW);
+    digitalWrite(4, HIGH);
+
+    changedByInterr = false;
+    Wire.beginTransmission(9);
+    Wire.write('1');
+    Wire.endTransmission();
+    delay(5000);
+    Wire.beginTransmission(9);
+    Wire.write('0');
+    Wire.endTransmission();
+
+  } else {
+    digitalWrite(5, HIGH);
+    digitalWrite(4, LOW);
+  }
+}
+void TurnGreen(void) {
+  Serial.println("button ");
+  if (digitalRead(4) == LOW) {
+    changedByInterr = true;
+  }
+}
